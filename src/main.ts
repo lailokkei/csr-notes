@@ -1,7 +1,4 @@
 import "./style.css";
-import typescriptLogo from "./typescript.svg";
-import viteLogo from "/vite.svg";
-import { setupCounter } from "./counter.ts";
 
 class Notes {
     serial = 0;
@@ -102,42 +99,60 @@ function render_list(notes: Notes) {
     });
 }
 
-function main() {
-    const notes = new Notes();
-    render_list(notes);
-}
+type Route = {
+    path: string;
+    handler: () => void;
+};
 
-const router = async () => {
-    const routes = [
-        { path: "/", view: () => console.log("dash") },
-        { path: "/posts", view: () => console.log("posts") },
-        { path: "/settings", view: () => console.log("setting") },
-    ];
+class Router {
+    routes: Route[] = [];
 
-    const potentialMatches = routes.map((route) => {
-        return {
-            route: route,
-            isMatch: location.pathname === route.path,
-        };
-    });
-
-    let match = potentialMatches.find(
-        (potentialMatches) => potentialMatches.isMatch,
-    );
-
-    if (!match) {
-        return;
+    add(path: string, handler: () => void) {
+        this.routes.push({ path, handler });
     }
 
-    console.log(match.route.view());
-    console.log(potentialMatches);
-};
-document.addEventListener("DOMContentLoaded", () => {
-    document.body.addEventListener("click", (e) => {
-        history.pushState(null, "what", "settings");
-        router();
-    });
-    router();
-});
+    async updateView() {
+        const currentPath = location.pathname;
+        for (let i = 0; i < this.routes.length; i++) {
+            if (this.routes[i].path === currentPath) {
+                this.routes[i].handler();
+            }
+        }
+    }
 
-// main();
+    start() {
+        window.addEventListener("popstate", this.updateView.bind(this));
+        document.addEventListener("DOMContentLoaded", () => {
+            document.body.addEventListener("click", (e: MouseEvent) => {
+                const target = e.target as HTMLAnchorElement;
+
+                if (target.matches("[data-link]")) {
+                    e.preventDefault();
+
+                    if (target.pathname === location.pathname) {
+                        return;
+                    }
+
+                    console.log("diff");
+                    history.pushState(null, "what", target.href);
+                    this.updateView();
+                }
+            });
+            this.updateView();
+        });
+    }
+}
+
+function main() {
+    const notes = new Notes();
+
+    const router = new Router();
+
+    router.add("/", () => console.log("home"));
+    router.add("/posts", () => console.log("posts"));
+    router.add("/settings", () => console.log("settings"));
+
+    router.start();
+}
+
+main();
