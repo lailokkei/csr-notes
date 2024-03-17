@@ -1,3 +1,4 @@
+import * as router from "./router";
 import "./style.css";
 
 class Notes {
@@ -15,25 +16,30 @@ class Notes {
         return this.ids.length - 1;
     }
 
-    idx(id: number): number {
+    idx(id: number): number | undefined {
         for (let i = 0; i < this.ids.length; i++) {
             if (id === this.ids[i]) {
                 return i;
             }
         }
-        return -1;
+        return undefined;
     }
 
     remove(id: number) {
-        const idx = this.idx(id);
+        const idx = this.idx(id)!;
         this.ids.splice(idx, 1);
         this.titles.splice(idx, 1);
         this.contents.splice(idx, 1);
     }
 }
 
-function render_note_page(notes: Notes, id: number) {
+function render_note(c: router.Context, notes: Notes, id: number) {
     const idx = notes.idx(id);
+    if (idx === undefined) {
+        render_404();
+        return;
+    }
+
     document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
     <div id="kys">d</div>
     <button id="exit">exit</button>
@@ -55,11 +61,11 @@ function render_note_page(notes: Notes, id: number) {
     const exit = document.querySelector("#exit");
 
     exit?.addEventListener("click", () => {
-        render_list(notes);
+        c.navigate("/");
     });
 }
 
-function render_list(notes: Notes) {
+function render_list(c: router.Context, notes: Notes) {
     document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
         <div>
         <button id="add-note">Add Note</button>
@@ -84,7 +90,7 @@ function render_list(notes: Notes) {
 
         const noteEl = document.querySelector(`#${divId}`);
         noteEl?.addEventListener("click", () => {
-            render_note_page(notes, id);
+            c.navigate(`/notes/${id}`);
         });
     };
 
@@ -99,60 +105,22 @@ function render_list(notes: Notes) {
     });
 }
 
-type Route = {
-    path: string;
-    handler: () => void;
-};
-
-class Router {
-    routes: Route[] = [];
-
-    add(path: string, handler: () => void) {
-        this.routes.push({ path, handler });
-    }
-
-    async updateView() {
-        const currentPath = location.pathname;
-        for (let i = 0; i < this.routes.length; i++) {
-            if (this.routes[i].path === currentPath) {
-                this.routes[i].handler();
-            }
-        }
-    }
-
-    start() {
-        window.addEventListener("popstate", this.updateView.bind(this));
-        document.addEventListener("DOMContentLoaded", () => {
-            document.body.addEventListener("click", (e: MouseEvent) => {
-                const target = e.target as HTMLAnchorElement;
-
-                if (target.matches("[data-link]")) {
-                    e.preventDefault();
-
-                    if (target.pathname === location.pathname) {
-                        return;
-                    }
-
-                    console.log("diff");
-                    history.pushState(null, "what", target.href);
-                    this.updateView();
-                }
-            });
-            this.updateView();
-        });
-    }
+function render_404() {
+    console.log("404");
 }
 
 function main() {
     const notes = new Notes();
 
-    const router = new Router();
-
-    router.add("/", () => console.log("home"));
-    router.add("/posts", () => console.log("posts"));
-    router.add("/settings", () => console.log("settings"));
-
-    router.start();
+    const r = router.newRouter();
+    r.add("/", (c: router.Context) => {
+        render_list(c, notes);
+    });
+    r.add("/notes/:id", (c: router.Context) => {
+        const id = c.param("id")!;
+        render_note(c, notes, Number(id));
+    });
+    r.start();
 }
 
 main();
